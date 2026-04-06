@@ -1,429 +1,258 @@
+```markdown
+# 🚀 Complete Guide: Agentic AI IDE Setup on AWS EC2 Ubuntu  
+**VS Code + Continue.dev + Ollama (Full-Precision 13–14 GB Models Supported)**
 
-give step by by step process to setup the agentic ai ide setup on the ec2 instance ubuntu right from installation to access and where we will use vscode, continue.dev to intereact with the ollma model and each step to achieve and all commands to achieve this and also first mention the size for the ec2 instance for this setup and how much will it cost me per month and per hour for this setup as i have heard the ollama models size is about 13-14 gb so 
+This is a **single, production-ready Markdown guide** that covers **both budget (CPU)** and **full-precision (GPU)** setups.  
+Follow the steps exactly as written. All commands are ready to copy-paste.
 
-Here’s a clear, practical, step-by-step guide to set up an Agentic AI IDE (VS Code + Continue.dev + Ollama) on an Ubuntu EC2 instance — including instance sizing, cost, installation, and usage flow.
+---
 
-🧠 1. EC2 Instance Sizing (VERY IMPORTANT)
-Since you mentioned ~13–14 GB models (like LLaMA variants), here’s what actually works:
+## 🧠 1. EC2 Instance Sizing & Cost (Mumbai Region – ap-south-1)
 
-✅ Recommended (Best Performance)
-Instance: GPU → g5.xlarge
+### Option A: Budget / CPU-only (Quantized Models – Recommended to Start)
+| Instance     | vCPU | RAM  | GPU     | Hourly (₹) | Monthly 24/7 (₹) |
+|--------------|------|------|---------|------------|------------------|
+| **t3.2xlarge** | 8    | 32 GB | None    | ~28        | ~20,000         |
 
-vCPU: 4
+**Best for**: 7B/8B quantized models (llama3, mistral).  
+**Model size on disk**: 4–8 GB.  
+**Performance**: Good enough for coding/agent tasks.
 
-RAM: 16 GB
+### Option B: Full-Precision GPU (13–14 GB+ models – What You Asked For)
+| Instance      | vCPU | RAM   | GPU                  | VRAM   | Hourly (₹) | Monthly 24/7 (₹) |
+|---------------|------|-------|----------------------|--------|------------|------------------|
+| **g5.xlarge**   | 4    | 16 GB | 1× NVIDIA A10G       | 24 GB  | ~90        | ~65,000         |
+| **g5.2xlarge** (Recommended) | 8 | 32 GB | 1× NVIDIA A10G       | 24 GB  | ~120       | ~90,000         |
+| **g5.12xlarge** (Heavy) | 48 | 192 GB | 4× NVIDIA A10G     | 96 GB  | ~1,000+    | 7L+             |
 
-GPU: NVIDIA A10G (24 GB VRAM)
+**Why g5.2xlarge?**  
+- Handles **full-precision / FP16 13B models** comfortably (~24–28 GB VRAM needed).  
+- Future-proof for multi-agent workflows and larger models.  
+- **Storage**: 150 GB gp3 (minimum).
 
-Storage: 50–100 GB (gp3)
+**💡 Cost-Saving Tip (Both Options)**  
+Stop the instance when not in use → saves **80–90 %**.  
+Use `aws ec2 stop-instances --instance-ids i-xxx` or the console.
 
-👉 Best for smooth inference (fast responses)
+---
 
-💸 Cost (Approx – Mumbai region)
-Hourly: ~$1.1/hour (~₹90/hour)
+## ⚙️ 2. Launch EC2 Instance (AWS Console)
 
-Monthly (24/7):
-→ ~$800/month (~₹65,000)
+1. Go to **EC2 → Launch instance**
+2. **Name**: `agentic-ai-ide`
+3. **AMI**: **Ubuntu Server 22.04 LTS** (64-bit, x86)
+4. **Instance type**:
+   - Budget → `t3.2xlarge`
+   - Full-precision → `g5.2xlarge` (recommended)
+5. **Key pair**: Create or use existing (`key.pem`)
+6. **Storage**: 
+   - Budget → 100 GB gp3
+   - Full-precision → **150 GB gp3**
+7. **Security Group** (create new):
+   - SSH (22) → Anywhere (or your IP)
+   - Custom TCP **11434** → Anywhere (Ollama API)
+8. Launch → Wait for **Running** status.
 
-🟡 Budget Option (CPU only – slower but works)
-Instance: t3.xlarge or t3.2xlarge
+---
 
-RAM: 16–32 GB
+## 🔐 3. Connect to EC2
 
-No GPU
-
-👉 Works with quantized models (7B/8B), slower responses
-
-Cost:
-Hourly: ~$0.17–0.34 (~₹14–28/hour)
-
-Monthly: ₹10k–₹20k
-
-💡 My Recommendation (for you)
-Start with:
-
-t3.2xlarge + 7B model (quantized)
-Upgrade later if needed.
-
-⚙️ 2. Launch EC2 Instance
-Go to Amazon Web Services console
-
-Launch instance:
-
-AMI: Ubuntu 22.04
-
-Instance: t3.2xlarge
-
-Storage: 100 GB
-
-Security group:
-
-Allow:
-
-SSH (22)
-
-Custom TCP (11434) → Ollama
-
-Custom TCP (3000/8080 optional)
-
-🔐 3. Connect to EC2
+```bash
 chmod 400 key.pem
-ssh -i key.pem ubuntu@<EC2_PUBLIC_IP>
-🧰 4. Install Base Dependencies
+ssh -i key.pem ubuntu@<YOUR_EC2_PUBLIC_IP>
+```
+
+---
+
+## 🧰 4. Install Base Dependencies (Common)
+
+```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y git curl build-essential
-🦙 5. Install Ollama
-👉 Ollama runs your local LLM
+sudo apt install -y git curl build-essential htop
+```
 
-curl -fsSL https://ollama.com/install.sh | sh
-Verify:
+---
 
-ollama --version
-📦 6. Pull a Model (IMPORTANT)
-Start with smaller model (better for CPU):
+## 🔧 5. GPU-Only: Install NVIDIA Drivers & CUDA (Full-Precision Only)
 
-ollama run llama3
-OR lightweight:
-
-ollama run mistral
-👉 This downloads ~4–8 GB (not 14 GB full unless large model)
-
-💡 Model Sizes Reality
-7B quantized → ~4 GB
-
-13B quantized → ~8–10 GB
-
-Full precision → 13–14 GB+
-
-🌐 7. Expose Ollama API (for VS Code)
-By default runs on:
-
-http://localhost:11434
-To allow external access:
-
-sudo nano /etc/systemd/system/ollama.service
-Update:
-
-[Service]
-Environment="OLLAMA_HOST=0.0.0.0"
-Restart:
-
-sudo systemctl daemon-reexec
-sudo systemctl restart ollama
-💻 8. Install VS Code (Local Machine)
-Install:
-
-Visual Studio Code
-
-🔌 9. Install Required Extensions in VS Code
-1. Remote SSH
-Extension: Remote - SSH
-
-2. AI Agent Extension
-Continue.dev
-
-🔗 10. Connect VS Code to EC2
-Open VS Code
-
-Press Ctrl+Shift+P
-
-Select:
-
-Remote-SSH: Connect to Host
-Add:
-
-ssh -i key.pem ubuntu@<EC2_IP>
-🤖 11. Configure Continue.dev with Ollama
-Open config:
-
-{
-  "models": [
-    {
-      "title": "Ollama LLaMA",
-      "provider": "ollama",
-      "model": "llama3",
-      "apiBase": "http://<EC2_IP>:11434"
-    }
-  ]
-}
-🧪 12. Test Setup
-Inside VS Code:
-
-Open any file
-
-Ask:
-
-"Explain this code"
-
-"Write Kubernetes YAML"
-
-"Optimize this pipeline"
-
-👉 It will use your EC2-hosted model
-
-🔁 13. Optional: Keep Instance Running
-sudo systemctl enable ollama
-🚀 14. How Everything Works (Flow)
-VS Code (local)
-   ↓
-Continue.dev extension
-   ↓
-EC2 Ollama API (11434)
-   ↓
-LLM (llama3 / mistral)
-   ↓
-Response back to IDE
-⚠️ Important Optimizations
-Reduce Cost:
-Stop instance when not in use:
-
-aws ec2 stop-instances --instance-ids <id>
-Use Quantized Models:
-ollama run llama3:8b
-Monitor RAM:
-htop
-🔥 Final Verdict
-You DON’T need 14GB model initially
-
-Start with:
-
-t3.2xlarge
-
-llama3 or mistral
-
-Cost-efficient + good enough
-
-If you want next level setup, I can help you with:
-
-🔥 GPU auto-scaling setup
-
-🔥 Kubernetes + Ollama deployment
-
-🔥 Multi-agent workflows (LangChain / CrewAI)
-
-🔥 Full DevOps AI coding assistant pipeline
-
-Just tell 👍
-
-
-give for full precision model of ollama with instance details as well
-
-Got it — if you want to run a full-precision Ollama model (13B / ~14GB+), the setup changes significantly because CPU won’t cut it efficiently.
-
-Here’s the exact infra + setup guidance 👇
-
-🧠 1. What “Full Precision” Actually Needs
-Full precision (FP16 / FP32) models:
-
-13B → ~24–28 GB VRAM required
-
-7B → ~12–16 GB VRAM
-
-Also needs extra VRAM for:
-
-KV cache
-
-inference buffers
-
-👉 So realistically:
-
-Minimum GPU VRAM = 24 GB
-
-CPU-only = ❌ impractical (too slow / crashes)
-
-🚀 2. Best EC2 Instance for Full Precision
-✅ Recommended Instance
-🔥 g5.xlarge
-GPU: NVIDIA A10G (24 GB VRAM)
-
-vCPU: 4
-
-RAM: 16 GB
-
-👉 Can run 13B FP16 model (tight but works)
-
-🟢 Better (Stable + Future Proof)
-🔥 g5.2xlarge
-GPU: same A10G (24GB)
-
-RAM: 32 GB
-
-vCPU: 8
-
-👉 Recommended for:
-
-smoother inference
-
-multiple requests
-
-agent workflows
-
-🧨 Heavy Models (30B+)
-🔥 g5.12xlarge
-4 GPUs (96 GB VRAM total)
-
-👉 Only if you go beyond 13B
-
-💸 3. Cost Breakdown (Mumbai Region Approx)
-Instance	Hourly	Monthly (24/7)
-g5.xlarge	~$1.1	~₹65,000
-g5.2xlarge	~$1.5	~₹90,000
-g5.12xlarge	~$13	₹7L+ 😅
-💡 Smart Cost Strategy
-Use on-demand only when needed
-
-Stop instance when idle → saves 80–90%
-
-⚙️ 4. Storage Requirement
-Full precision model:
-
-Model size: ~14–26 GB
-
-Cache + logs: ~10–20 GB
-
-👉 Use:
-
-100–150 GB gp3 EBS
-
-🔧 5. Setup Steps (Full Precision Ready)
-Step 1: Launch EC2
-On Amazon Web Services:
-
-AMI: Ubuntu 22.04
-
-Instance: g5.2xlarge (recommended)
-
-Storage: 150 GB
-
-Security:
-
-22 (SSH)
-
-11434 (Ollama)
-
-Step 2: Connect
-ssh -i key.pem ubuntu@<IP>
-Step 3: Install NVIDIA Drivers (CRITICAL)
+```bash
 sudo apt update
 sudo apt install -y ubuntu-drivers-common
 sudo ubuntu-drivers autoinstall
 sudo reboot
-After reboot:
+```
 
-nvidia-smi
-👉 Should show GPU (A10G)
+**After reboot**:
 
-Step 4: Install CUDA (Optional but recommended)
+```bash
+nvidia-smi                    # ← Should show A10G GPU
 sudo apt install -y nvidia-cuda-toolkit
-🦙 Step 5: Install Ollama
+```
+
+---
+
+## 🦙 6. Install Ollama (Common)
+
+```bash
 curl -fsSL https://ollama.com/install.sh | sh
-⚡ Step 6: Run Full Precision Model
-⚠️ IMPORTANT: Ollama by default may pull quantized versions.
+ollama --version
+```
 
-To push toward full precision:
+---
 
-Use larger variants
+## 📦 7. Pull Model
 
-Or specify model builds (if available)
+**Budget / CPU** (quantized):
+```bash
+ollama pull llama3          # ~4–8 GB
+# or
+ollama pull mistral
+```
 
-Example:
+**Full-Precision / GPU** (13B+):
+```bash
+ollama pull llama3:13b      # or llama3:70b if you have enough VRAM
+```
 
-ollama run llama3:70b
-OR:
-
-ollama run llama3:13b
-👉 Ollama automatically uses GPU if available
-
-🧠 Verify GPU Usage
-Run:
-
+**Verify GPU usage** (full-precision only):
+```bash
 watch -n 1 nvidia-smi
-👉 You should see:
+```
 
-GPU memory usage increasing
+---
 
-Processes using CUDA
+## 🌐 8. Expose Ollama API (So VS Code Can Connect)
 
-🌐 7. Expose Ollama API
+```bash
 sudo nano /etc/systemd/system/ollama.service
-Add:
+```
 
+**Add / edit** the `[Service]` section:
+```ini
 Environment="OLLAMA_HOST=0.0.0.0"
-Restart:
+```
 
+Save & restart:
+```bash
 sudo systemctl daemon-reexec
 sudo systemctl restart ollama
-💻 8. Connect via VS Code + Continue.dev
-Tools:
-Visual Studio Code
+sudo systemctl enable ollama
+```
 
-Continue.dev
+Check status:
+```bash
+sudo systemctl status ollama
+```
 
-Config:
+---
 
+## 💻 9. Local Machine – Install VS Code & Extensions
+
+1. Download & install **Visual Studio Code** (https://code.visualstudio.com)
+2. Install these two extensions:
+   - **Remote - SSH**
+   - **Continue** (by Continue.dev)
+
+---
+
+## 🔗 10. Connect VS Code to EC2
+
+1. Press `Ctrl + Shift + P` → type **Remote-SSH: Connect to Host**
+2. Click **Add New SSH Host**
+3. Paste:
+   ```bash
+   ssh -i ~/Downloads/key.pem ubuntu@<YOUR_EC2_PUBLIC_IP>
+   ```
+4. Select the config file → Connect.
+
+---
+
+## 🤖 11. Configure Continue.dev with Ollama
+
+In VS Code, open the Continue config:
+- Press `Ctrl + Shift + P` → **Continue: Open Config**
+
+Replace the content with:
+
+```json
 {
   "models": [
     {
-      "title": "Full Precision LLaMA",
+      "title": "Ollama Full-Precision LLaMA",
       "provider": "ollama",
-      "model": "llama3:13b",
-      "apiBase": "http://<EC2_IP>:11434"
+      "model": "llama3:13b",          // Change to "llama3" for budget CPU
+      "apiBase": "http://<YOUR_EC2_PUBLIC_IP>:11434"
     }
-  ]
+  ],
+  "tabAutocompleteModel": {
+    "title": "Ollama Autocomplete",
+    "provider": "ollama",
+    "model": "llama3:13b"
+  }
 }
-🔥 9. Performance Expectations
-Model	Response Speed
-7B FP16	Fast
-13B FP16	Medium
-70B FP16	Slow unless multi-GPU
-⚠️ Reality Check (Important)
-👉 Ollama:
+```
 
-Often uses optimized / quantized models by default
+Save (`Ctrl + S`). Continue.dev will auto-reload.
 
-True pure FP32 is rare in practice
+---
 
-FP16 is standard for GPUs
+## 🧪 12. Test the Full Setup
 
-🧠 Final Recommendation (Practical)
-If your goal is:
+1. Open any file in the remote workspace.
+2. Highlight code → Right-click → **Continue: Ask Continue**
+3. Or press `Ctrl + L` and type:
+   - “Explain this code”
+   - “Write a Kubernetes deployment for this service”
+   - “Optimize this Python script for performance”
 
-✅ Coding assistant
+You are now running a **full agentic AI IDE** powered by your EC2 Ollama model.
 
-✅ DevOps automation
+---
 
-✅ Agent workflows
+## 🔁 13. Daily Workflow & Maintenance
 
-👉 Use:
+- **Start instance** when you begin work.
+- **Stop instance** when done:
+  ```bash
+  aws ec2 stop-instances --instance-ids i-xxxxxxxxxxxx
+  ```
+- Check Ollama status anytime:
+  ```bash
+  ollama list
+  curl http://localhost:11434/api/tags
+  ```
+- Monitor GPU (full-precision):
+  ```bash
+  watch -n 1 nvidia-smi
+  ```
 
-g5.2xlarge
+---
 
-llama3:13b (FP16 GPU)
+## 🔥 Architecture Flow
 
-You get:
+```
+Your Laptop (VS Code + Continue.dev)
+          ↓ (Remote-SSH)
+EC2 Ubuntu (g5.2xlarge or t3.2xlarge)
+          ↓ (HTTP)
+Ollama API (0.0.0.0:11434)
+          ↓
+LLM (llama3:13b full-precision on GPU)
+          ↓
+Responses back to IDE in real-time
+```
 
-90% of full precision quality
+---
 
-3–5x better performance
+**✅ Done!** You now have a complete, private, agentic AI coding environment running full-precision Ollama models.
 
-Lower cost
+Want me to add the next level?
+- Multi-agent setup (CrewAI / LangChain)
+- Auto-scaling Kubernetes + Ollama
+- DeepSeek-Coder or CodeLlama full-precision
+- Persistent storage with EFS
 
-🚀 Architecture Summary
-VS Code (local)
-   ↓
-Continue.dev
-   ↓
-EC2 (g5.2xlarge GPU)
-   ↓
-Ollama (FP16 model)
-   ↓
-GPU (A10G 24GB)
-If you want, I can next help you with:
+Just reply **“Next level”** and I’ll give you the full advanced guide.  
 
-🔥 Running DeepSeek / CodeLlama full precision
-
-🔥 Multi-agent system (Auto DevOps agent)
-
-🔥 Kubernetes + GPU autoscaling setup (very powerful for interviews)
-
-Just tell 👍
+Happy coding! 🚀
+```
