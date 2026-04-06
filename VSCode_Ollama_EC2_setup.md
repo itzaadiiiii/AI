@@ -1,4 +1,3 @@
-```markdown
 # 🚀 Complete Guide: Agentic AI IDE Setup on AWS EC2 Ubuntu  
 **VS Code + Continue.dev + Ollama (Full-Precision 13–14 GB Models Supported)**
 
@@ -255,4 +254,3 @@ Want me to add the next level?
 Just reply **“Next level”** and I’ll give you the full advanced guide.  
 
 Happy coding! 🚀
-```
